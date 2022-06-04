@@ -1,0 +1,3 @@
+[submodule "matplotlibcpp17"]
+	path = matplotlibcpp17
+	url = https://github.com/soblin/matplotlibcpp17.git
