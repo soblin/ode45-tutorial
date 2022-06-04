@@ -5,6 +5,8 @@ project(ode45_tutorial
 )
 
 add_subdirectory(matplotlibcpp17)
+add_subdirectory(xtl)
+add_subdirectory(xtensor)
 
 add_executable(main main.cpp)
-target_link_libraries(main PUBLIC matplotlibcpp17::matplotlibcpp17)
+target_link_libraries(main PUBLIC matplotlibcpp17::matplotlibcpp17 xtensor)
