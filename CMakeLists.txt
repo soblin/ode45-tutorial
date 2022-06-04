@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5.0)
+cmake_minimum_required(VERSION 3.12)
 
 project(ode45_tutorial
   VERSION 1.0.0
@@ -10,3 +10,4 @@ add_subdirectory(xtensor)
 
 add_executable(main main.cpp)
 target_link_libraries(main PUBLIC matplotlibcpp17::matplotlibcpp17 xtensor)
+target_compile_options(main PUBLIC -std=c++17)
