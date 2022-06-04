@@ -1,3 +1,6 @@
 [submodule "matplotlibcpp17"]
 	path = matplotlibcpp17
 	url = https://github.com/soblin/matplotlibcpp17.git
+[submodule "xtensor"]
+	path = xtensor
+	url = https://github.com/xtensor-stack/xtensor.git
