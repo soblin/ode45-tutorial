@@ -7,36 +7,66 @@
 
 using namespace std;
 
-double euler(const double t, const double y, const double h,
-             std::function<double(double, double)> dy) {
+double euler1(const double t, const double y, const double h,
+              std::function<double(double, double)> dy) {
   return y + dy(t, y) * h;
 }
 
 double rk4(const double t, const double y, const double h,
            std::function<double(double, double)> dy) {
+  static constexpr double a21 = 1.0 / 2;
+  static constexpr double a32 = 1.0 / 2;
+  static constexpr double b1 = 1.0 / 6;
+  static constexpr double b2 = 1.0 / 3;
+  static constexpr double b3 = 1.0 / 3;
+  static constexpr double b4 = 1.0 / 6;
+  static constexpr double c2 = 1.0 / 2;
+  static constexpr double c3 = 1.0 / 2;
+  // static constexpr double c4 = 1;
   double k1 = dy(t, y);
-  double k2 = dy(t + h / 2, y + h / 2 * k1);
-  double k3 = dy(t + h / 2, y + h / 2 * k2);
+  double k2 = dy(t + c2 * h, y + h * a21 * k1);
+  double k3 = dy(t + c3 * h, y + h * a32 * k2);
   double k4 = dy(t + h, y + h * k3);
-  return y + h / 6 * (k1 + 2 * k2 + 2 * k3 + k4);
+  return y + h * (b1 * k1 + b2 * k2 + b3 * k3 + b4 * k4);
 }
 
-// this butcher table is from Runge-Kutta-Fehlberg
 double rk5(const double t, const double y, const double h,
            std::function<double(double, double)> dy) {
+  // butcher table from Runge-Kutta-Fehlberg
+  static constexpr double a21 = 1.0 / 4;
+  static constexpr double a31 = 3.0 / 32;
+  static constexpr double a32 = 9.0 / 32;
+  static constexpr double a41 = 1932.0 / 2197;
+  static constexpr double a42 = -7200.0 / 2197;
+  static constexpr double a43 = 7296.0 / 2197;
+  static constexpr double a51 = 439.0 / 216;
+  static constexpr double a52 = -8.0;
+  static constexpr double a53 = 3680.0 / 513;
+  static constexpr double a54 = -845 / 4104;
+  static constexpr double a61 = -8.0 / 27;
+  static constexpr double a62 = 2.0;
+  static constexpr double a63 = -3544.0 / 2565;
+  static constexpr double a64 = 1859.0 / 4104;
+  static constexpr double a65 = -11.0 / 40;
+  static constexpr double b1 = 16.0 / 135;
+  // static constexpr double b2 = 0;
+  static constexpr double b3 = 6656.0 / 12825;
+  static constexpr double b4 = 28561.0 / 56430;
+  static constexpr double b5 = -9.0 / 50;
+  static constexpr double b6 = 2.0 / 55;
+  static constexpr double c2 = 1.0 / 4;
+  static constexpr double c3 = 3.0 / 8;
+  static constexpr double c4 = 12.0 / 13;
+  // static constexor double c5 = 1;
+  static constexpr double c6 = 1.0 / 2;
   double k1 = dy(t, y);
-  double k2 = dy(t + h / 4, y + h / 4 * k1);
-  double k3 = dy(t + 3 * h / 8, y + 3 * h / 32 * k1 + 9 * h / 32 * k2);
-  double k4 =
-      dy(t + 12 * h / 13, y + 1932 * h / 2197 * k1 - 7200 * h / 2197 * k2 +
-                              7296 * h / 2197 * k3);
-  double k5 = dy(t + h, y + 439 * h / 216 * k1 - 8 * h * k2 +
-                            3680 * h / 513 * k3 - 845 * h / 4104 * k4);
-  double k6 =
-      dy(t + h / 2, y - 8 * h / 27 * k1 + 2 * h * k2 - 3544 * h / 2565 * k3 +
-                        1859 * h / 4104 * k4 - 11 * h / 40 * k5);
-  return y + h * (16.0 / 135 * k1 + 6656.0 / 12825 * k3 + 28561.0 / 56430 * k4 -
-                  9.0 / 50 * k5 + 2.0 / 55 * k6);
+  double k2 = dy(t + c2 * h, y + h * a21 * k1);
+  double k3 = dy(t + c3 * h, y + h * (a31 * k1 + a32 * k2));
+  double k4 = dy(t + c4 * h, y + h * (a41 * k1 + a42 * k2 + a43 * k3));
+  double k5 = dy(t + h, y + h * (a51 * k1 + a52 * k2 + a53 * k3 + a54 * k4));
+  double k6 = dy(t + c6 * h, y + h * (a61 * k1 + a62 * k2 + a63 * k3 +
+                                      a64 * k4 + a65 * k5));
+  return y + h * (b1 * k1 + b3 * k3 + b4 * k4 + b5 * k5 + b6 * k6);
 }
 
 int main() {
@@ -63,7 +93,7 @@ int main() {
   vector<double> rk5_solution({y0});
 
   for (unsigned i = 1; i < ts.size(); ++i) {
-    euler_solution.push_back(euler(ts[i - 1], euler_solution[i - 1], h, dy));
+    euler_solution.push_back(euler1(ts[i - 1], euler_solution[i - 1], h, dy));
     rk4_solution.push_back(rk4(ts[i - 1], rk4_solution[i - 1], h, dy));
     rk5_solution.push_back(rk5(ts[i - 1], rk5_solution[i - 1], h, dy));
   }
