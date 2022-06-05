@@ -4,16 +4,18 @@
 
 #include <vector>
 #include <functional>
+#include <tuple>
 
 using namespace std;
 
-double euler1(const double t, const double y, const double h,
-              std::function<double(double, double)> dy) {
-  return y + dy(t, y) * h;
+std::tuple<double, double> euler1(const double t, const double y,
+                                  const double h,
+                                  std::function<double(double, double)> dy) {
+  return {y + dy(t, y) * h, t + h};
 }
 
-double rk4(const double t, const double y, const double h,
-           std::function<double(double, double)> dy) {
+std::tuple<double, double> rk4(const double t, const double y, const double h,
+                               std::function<double(double, double)> dy) {
   static constexpr double a21 = 1.0 / 2;
   static constexpr double a32 = 1.0 / 2;
   static constexpr double b1 = 1.0 / 6;
@@ -27,11 +29,11 @@ double rk4(const double t, const double y, const double h,
   double k2 = dy(t + c2 * h, y + h * a21 * k1);
   double k3 = dy(t + c3 * h, y + h * a32 * k2);
   double k4 = dy(t + h, y + h * k3);
-  return y + h * (b1 * k1 + b2 * k2 + b3 * k3 + b4 * k4);
+  return {y + h * (b1 * k1 + b2 * k2 + b3 * k3 + b4 * k4), t + h};
 }
 
-double rk5(const double t, const double y, const double h,
-           std::function<double(double, double)> dy) {
+std::tuple<double, double> rk5(const double t, const double y, const double h,
+                               std::function<double(double, double)> dy) {
   // butcher table from Runge-Kutta-Fehlberg
   static constexpr double a21 = 1.0 / 4;
   static constexpr double a31 = 3.0 / 32;
@@ -66,12 +68,12 @@ double rk5(const double t, const double y, const double h,
   double k5 = dy(t + h, y + h * (a51 * k1 + a52 * k2 + a53 * k3 + a54 * k4));
   double k6 = dy(t + c6 * h, y + h * (a61 * k1 + a62 * k2 + a63 * k3 +
                                       a64 * k4 + a65 * k5));
-  return y + h * (b1 * k1 + b3 * k3 + b4 * k4 + b5 * k5 + b6 * k6);
+  return {y + h * (b1 * k1 + b3 * k3 + b4 * k4 + b5 * k5 + b6 * k6), t + h};
 }
 
-std::pair<double, double> ode45(const double t, const double y, const double h,
-                                const double tol,
-                                std::function<double(double, double)> dy) {
+std::tuple<double, double, double>
+ode45(const double t, const double y, const double h, const double tol,
+      std::function<double(double, double)> dy) {
   // butcher table from Runge-Kutta-Fehlberg
   static constexpr double a21 = 1.0 / 4;
   static constexpr double a31 = 3.0 / 32;
@@ -105,32 +107,47 @@ std::pair<double, double> ode45(const double t, const double y, const double h,
   static constexpr double c4 = 12.0 / 13;
   // static constexor double c5 = 1;
   static constexpr double c6 = 1.0 / 2;
-  const double k1 = dy(t, y);
-  const double k2 = dy(t + c2 * h, y + h * a21 * k1);
-  const double k3 = dy(t + c3 * h, y + h * (a31 * k1 + a32 * k2));
-  const double k4 = dy(t + c4 * h, y + h * (a41 * k1 + a42 * k2 + a43 * k3));
-  const double k5 =
-      dy(t + h, y + h * (a51 * k1 + a52 * k2 + a53 * k3 + a54 * k4));
-  const double k6 = dy(t + c6 * h, y + h * (a61 * k1 + a62 * k2 + a63 * k3 +
-                                            a64 * k4 + a65 * k5));
+  double k1 = dy(t, y);
+  double k2 = dy(t + c2 * h, y + h * a21 * k1);
+  double k3 = dy(t + c3 * h, y + h * (a31 * k1 + a32 * k2));
+  double k4 = dy(t + c4 * h, y + h * (a41 * k1 + a42 * k2 + a43 * k3));
+  double k5 = dy(t + h, y + h * (a51 * k1 + a52 * k2 + a53 * k3 + a54 * k4));
+  double k6 = dy(t + c6 * h, y + h * (a61 * k1 + a62 * k2 + a63 * k3 +
+                                      a64 * k4 + a65 * k5));
   // NOTE: update discretization
   const double e =
       fabs(h * ((b1 - b1_) * k1 + (b3 - b3_) * k3 + (b4 - b4_) * k4 +
                 (b5 - b5_) * k5 + (b6 - b6_) * k6));
   double h_new = h;
-  if (e > h * tol)
+  bool reeval = false;
+  if (e > h * tol) {
     h_new = h / 2;
-  else if (e < h * tol / 10)
+    reeval = true;
+  } else if (e < h * tol / 10) {
     h_new = 2 * h;
-
-  // this implementation is not complete. If h_new is updated, do re-calculation
-  // So all the above solver should return [y_next, t_next(, +h for ode45)]
-  return {y + h_new * (b1 * k1 + b3 * k3 + b4 * k4 + b5 * k5 + b6 * k6), h_new};
+    reeval = true;
+  }
+  if (reeval) {
+    double k1 = dy(t, y);
+    double k2 = dy(t + c2 * h_new, y + h_new * a21 * k1);
+    double k3 = dy(t + c3 * h_new, y + h_new * (a31 * k1 + a32 * k2));
+    double k4 =
+        dy(t + c4 * h_new, y + h_new * (a41 * k1 + a42 * k2 + a43 * k3));
+    double k5 =
+        dy(t + h_new, y + h_new * (a51 * k1 + a52 * k2 + a53 * k3 + a54 * k4));
+    double k6 = dy(t + c6 * h_new, y + h_new * (a61 * k1 + a62 * k2 + a63 * k3 +
+                                                a64 * k4 + a65 * k5));
+    return {y + h_new * (b1 * k1 + b3 * k3 + b4 * k4 + b5 * k5 + b6 * k6),
+            t + h_new, h_new};
+  } else
+    return {y + h * (b1 * k1 + b3 * k3 + b4 * k4 + b5 * k5 + b6 * k6), t + h,
+            h};
 }
 
 int main() {
   pybind11::scoped_interpreter guard{};
   auto plt = matplotlibcpp17::pyplot::import();
+  auto [fig, ax] = plt.subplots();
 
   // data
   static constexpr double y0 = 10.0;
@@ -146,55 +163,71 @@ int main() {
   auto analytical_xt = y0 * xt::exp(-a * dts_xt);
   vector<double> dts(dts_xt.begin(), dts_xt.end());
   vector<double> analytical(analytical_xt.begin(), analytical_xt.end());
-
-  // euler1, rk4, rk5
-  vector<double> ts({t0});
-  vector<double> euler1_solution({y0});
-  vector<double> rk4_solution({y0});
-  vector<double> rk5_solution({y0});
-  {
-    double t;
-    int i;
-    for (t = t0, i = 0; t < tf; t += h, i++) {
-      euler1_solution.push_back(euler1(ts[i], euler1_solution[i], h, dy));
-      rk4_solution.push_back(rk4(ts[i], rk4_solution[i], h, dy));
-      rk5_solution.push_back(rk5(ts[i], rk5_solution[i], h, dy));
-      ts.push_back(t + h);
-    }
-  }
-
-  // ode45
-  vector<double> ts_ode45({t0});
-  vector<double> ode45_solution({y0});
-  const double tol = 0.1;
-  {
-    double t;
-    int i;
-    double h_ode45 = h;
-    for (t = t0, i = 0; t < tf; t += h_ode45, i++) {
-      auto [y_next, h_ode45_next] =
-          ode45(ts_ode45[i], ode45_solution[i], h_ode45, tol, dy);
-      ode45_solution.push_back(y_next);
-      h_ode45 = h_ode45_next;
-      ts_ode45.push_back(t + h_ode45_next);
-    }
-  }
-  // plot
-  auto [fig, ax] = plt.subplots();
   ax.plot(Args(dts, analytical), Kwargs("color"_a = "blue", "linewidth"_a = 1.5,
                                         "label"_a = "Analytical solution"));
-  ax.plot(Args(ts, euler1_solution),
-          Kwargs("color"_a = "orange", "linewidth"_a = 1.0,
-                 "label"_a = "1st Euler", "marker"_a = "*"));
-  ax.plot(Args(ts, rk4_solution),
-          Kwargs("color"_a = "purple", "linewidth"_a = 1.0,
-                 "label"_a = "4th Runge-Kutta", "marker"_a = "o"));
-  ax.plot(Args(ts, rk5_solution),
-          Kwargs("color"_a = "green", "linewidth"_a = 1.0,
-                 "label"_a = "5th Runge-Kutta", "marker"_a = "x"));
-  ax.plot(Args(ts_ode45, ode45_solution),
-          Kwargs("color"_a = "red", "linewidth"_a = 1.0, "label"_a = "ode45",
-                 "marker"_a = "x"));
+
+  // euler1
+  {
+    vector<double> ts({t0});
+    vector<double> ys({y0});
+    for (double t = t0; t < tf;) {
+      auto [y_next, t_next] = euler1(ts.back(), ys.back(), h, dy);
+      ys.push_back(y_next);
+      ts.push_back(t_next);
+      t = t_next;
+    }
+    ax.plot(Args(ts, ys), Kwargs("color"_a = "orange", "linewidth"_a = 1.0,
+                                 "label"_a = "1st Euler", "marker"_a = "*"));
+  }
+
+  // rk4
+  {
+    vector<double> ts({t0});
+    vector<double> ys({y0});
+    for (double t = t0; t < tf;) {
+      auto [y_next, t_next] = rk5(ts.back(), ys.back(), h, dy);
+      ys.push_back(y_next);
+      ts.push_back(t_next);
+      t = t_next;
+    }
+    ax.plot(Args(ts, ys),
+            Kwargs("color"_a = "green", "linewidth"_a = 1.0,
+                   "label"_a = "5th Runge-Kutta", "marker"_a = "x"));
+  }
+
+  // rk5
+  // {
+  //   vector<double> ts({t0});
+  //   vector<double> ys({y0});
+  //   for (double t = t0; t < tf;) {
+  //     auto [y_next, t_next] = rk4(ts.back(), ys.back(), h, dy);
+  //     ys.push_back(y_next);
+  //     ts.push_back(t_next);
+  //     t = t_next;
+  //   }
+  //   ax.plot(Args(ts, ys),
+  //           Kwargs("color"_a = "purple", "linewidth"_a = 1.0,
+  //                  "label"_a = "4th Runge-Kutta", "marker"_a = "o"));
+  // }
+
+  // ode45
+  {
+    vector<double> ts({t0});
+    vector<double> ys({y0});
+    double h_ode45 = h;
+    const double tol = 0.1;
+    for (double t = t0; t < tf;) {
+      auto [y_next, t_next, h_next] =
+          ode45(ts.back(), ys.back(), h_ode45, tol, dy);
+      ys.push_back(y_next);
+      ts.push_back(t_next);
+      h_ode45 = h_next;
+      t = t_next;
+    }
+    ax.scatter(Args(ts, ys), Kwargs("color"_a = "blue", "label"_a = "ode45",
+                                    "facecolor"_a = "None", "s"_a = 50));
+  }
+
   ax.legend();
   ax.grid(Args(true));
   plt.show();
